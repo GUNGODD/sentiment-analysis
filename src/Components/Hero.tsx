@@ -22,7 +22,7 @@ export const Hero = () => {
               Gemini
             </a>
           </span>
-          library to perform sentiment analysis on the text.
+          API to perform sentiment analysis on the text.
         </p>
         {/*TODO:  TextArea Form */}
         <TextAreaForm />
