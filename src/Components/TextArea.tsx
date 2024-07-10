@@ -1,24 +1,27 @@
 import { useState } from "react";
 import axios, { AxiosError } from "axios";
 
-interface SafetyRating {
-  category: string;
-  probability: string;
+interface Candidate {
+  output: string;
 }
 
 interface ApiResponse {
-  message: string;
-  safetyRatings?: SafetyRating[];
+  candidates: Candidate[];
+  usageMetadata: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+    totalTokenCount: number;
+  };
 }
 
 export function TextAreaForm() {
   const [text, setText] = useState<string>("");
-  const [sentiment, setSentiment] = useState<string>("");
+  const [sentiments, setSentiments] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
   const PromptData =
-    "just analyze this X comment sentiment in one line with emoji in 20 words nothing else and return only single line response nothing else and return it in string  ";
+    "just analyze this X comment sentiment in one line with emoji in 20 words nothing else and return only single line response nothing else and return it in string ";
 
   const handleSubmit = async (): Promise<void> => {
     setIsLoading(true);
@@ -36,14 +39,16 @@ export function TextAreaForm() {
         },
       );
       console.log("API response:", response.data); // Debug log
-      setSentiment(response.data.message);
+
+      if (response.data.candidates && response.data.candidates.length > 0) {
+        setSentiments(response.data.candidates);
+      } else {
+        setError("No sentiment analysis result found");
+      }
       setIsLoading(false);
     } catch (error) {
       const axiosError = error as AxiosError<{ error: { message: string } }>;
-      console.error(
-        "API error:",
-        axiosError.response?.data?.error?.message || error.message,
-      ); // Debug log
+      console.error("API error:", axiosError.response?.data || error.message); // Debug log
       setError(
         axiosError.response?.data?.error?.message || "Something went wrong",
       );
@@ -80,11 +85,49 @@ export function TextAreaForm() {
       {isLoading && <p>Loading...</p>}
       {error && <p className="text-red-600">Error: {error}</p>}
       <h1 className="font-bold text-3xl mb-8">Sentiment Analysis Result:</h1>
-      {sentiment && (
-        <p className="w-full shadow-lg border-spacing-x-3.5 p-5 shadow-blue-600 resize-none rounded-lg ring-card-foreground-100 border border-fuchsia-500">
-          {sentiment}
-        </p>
+      {sentiments.length > 0 && (
+        <div className="w-full shadow-lg border-spacing-x-3.5 p-5 shadow-blue-600 rounded-lg ring-card-foreground-100 border border-fuchsia-500">
+          <div className="table w-full">
+            <div className="table-header-group">
+              <div className="table-row">
+                <div className="table-cell font-bold border px-4 py-2">
+                  Sentiment
+                </div>
+                <div className="table-cell font-bold border px-4 py-2">
+                  Response
+                </div>
+              </div>
+            </div>
+            <div className="table-row-group">
+              {sentiments.map((sentiment, index) => (
+                <div key={index} className="table-row">
+                  <div className="table-cell border px-4 py-2">
+                    {classifySentiment(sentiment.output)}
+                  </div>
+                  <div className="table-cell border px-4 py-2">
+                    {sentiment.output}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
+
+const classifySentiment = (message?: string): string => {
+  if (!message) {
+    return "Unknown";
+  }
+  if (message.toLowerCase().includes("positive")) {
+    return "Positive";
+  } else if (message.toLowerCase().includes("negative")) {
+    return "Negative";
+  } else if (message.toLowerCase().includes("neutral")) {
+    return "Neutral";
+  } else {
+    return "Unknown";
+  }
+};
