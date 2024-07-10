@@ -2,7 +2,13 @@ import { useState } from "react";
 import axios, { AxiosError } from "axios";
 
 interface Candidate {
-  output: string;
+  content: {
+    parts: { text: string }[];
+    role: string;
+  };
+  finishReason: string;
+  index: number;
+  safetyRatings: { category: string; probability: string }[];
 }
 
 interface ApiResponse {
@@ -16,12 +22,12 @@ interface ApiResponse {
 
 export function TextAreaForm() {
   const [text, setText] = useState<string>("");
-  const [sentiments, setSentiments] = useState<Candidate[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
   const PromptData =
-    "just analyze this X comment sentiment in one line with emoji in 20 words nothing else and return only single line response nothing else and return it in string ";
+    "Analyze the sentiment of the following comment and respond with a single line that includes the sentiment (positive, negative, or neutral) and an appropriate emoji: ";
 
   const handleSubmit = async (): Promise<void> => {
     setIsLoading(true);
@@ -38,20 +44,19 @@ export function TextAreaForm() {
           },
         },
       );
-      console.log("API response:", response.data); // Debug log
 
       if (response.data.candidates && response.data.candidates.length > 0) {
-        setSentiments(response.data.candidates);
+        setCandidates(response.data.candidates);
       } else {
         setError("No sentiment analysis result found");
       }
-      setIsLoading(false);
     } catch (error) {
       const axiosError = error as AxiosError<{ error: { message: string } }>;
-      console.error("API error:", axiosError.response?.data || error.message); // Debug log
+      console.error("API error:", axiosError.response?.data || error.message);
       setError(
         axiosError.response?.data?.error?.message || "Something went wrong",
       );
+    } finally {
       setIsLoading(false);
     }
   };
@@ -84,50 +89,45 @@ export function TextAreaForm() {
       </button>
       {isLoading && <p>Loading...</p>}
       {error && <p className="text-red-600">Error: {error}</p>}
-      <h1 className="font-bold text-3xl mb-8">Sentiment Analysis Result:</h1>
-      {sentiments.length > 0 && (
+      {candidates.length > 0 && (
         <div className="w-full shadow-lg border-spacing-x-3.5 p-5 shadow-blue-600 rounded-lg ring-card-foreground-100 border border-fuchsia-500">
-          <div className="table w-full">
-            <div className="table-header-group">
-              <div className="table-row">
-                <div className="table-cell font-bold border px-4 py-2">
-                  Sentiment
-                </div>
-                <div className="table-cell font-bold border px-4 py-2">
-                  Response
-                </div>
-              </div>
-            </div>
-            <div className="table-row-group">
-              {sentiments.map((sentiment, index) => (
-                <div key={index} className="table-row">
-                  <div className="table-cell border px-4 py-2">
-                    {classifySentiment(sentiment.output)}
-                  </div>
-                  <div className="table-cell border px-4 py-2">
-                    {sentiment.output}
-                  </div>
-                </div>
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className="border px-4 py-2">Index</th>
+                <th className="border px-4 py-2">Finish Reason</th>
+                <th className="border px-4 py-2">Safety Ratings</th>
+                <th className="border px-4 py-2">Parts Text</th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map((candidate, index) => (
+                <tr key={index}>
+                  <td className="border px-4 py-2">{candidate.index}</td>
+                  <td className="border px-4 py-2">{candidate.finishReason}</td>
+                  <td className="border px-4 py-2">
+                    <ul>
+                      {candidate.safetyRatings.map((rating, ratingIndex) => (
+                        <li key={ratingIndex}>
+                          <strong>Category:</strong> {rating.category},{" "}
+                          <strong>Probability:</strong> {rating.probability}
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td className="border px-4 py-2">
+                    <ul>
+                      {candidate.content.parts.map((part, partIndex) => (
+                        <li key={partIndex}>{part.text}</li>
+                      ))}
+                    </ul>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   );
 }
-
-const classifySentiment = (message?: string): string => {
-  if (!message) {
-    return "Unknown";
-  }
-  if (message.toLowerCase().includes("positive")) {
-    return "Positive";
-  } else if (message.toLowerCase().includes("negative")) {
-    return "Negative";
-  } else if (message.toLowerCase().includes("neutral")) {
-    return "Neutral";
-  } else {
-    return "Unknown";
-  }
-};
